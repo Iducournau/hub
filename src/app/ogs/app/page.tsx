@@ -2,10 +2,13 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import {
   Key, FileText, TrendingUp, AlertTriangle,
-  ArrowUpRight, ArrowDownRight, Minus, MousePointerClick, Eye
+  ArrowUpRight, ArrowDownRight, Minus, MousePointerClick, Eye,
+  Sparkles, Calendar
 } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { startOfMonth, subMonths, format } from 'date-fns'
+import { fr } from 'date-fns/locale'
 
 // Position badge color
 function getPositionColor(position: number | null) {
@@ -21,26 +24,45 @@ function formatNumber(num: number | null) {
   return num.toLocaleString('fr-FR')
 }
 
-function ChangeIndicator({ change, inverted = false }: { change: number | null; inverted?: boolean }) {
+function formatCompactNumber(num: number | null) {
+  if (num === null || num === undefined) return '—'
+  if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`
+  if (num >= 1000) return `${(num / 1000).toFixed(1)}k`
+  return num.toLocaleString('fr-FR')
+}
+
+function ChangeIndicator({ change, inverted = false, showPercent = true }: { change: number | null; inverted?: boolean; showPercent?: boolean }) {
   if (change === null || change === undefined) return <Minus className="w-4 h-4 text-muted-foreground" />
 
-  // For position, lower is better, so we invert the color logic
   const isPositive = inverted ? change < 0 : change > 0
   const isNegative = inverted ? change > 0 : change < 0
 
   if (isPositive) return (
     <span className="flex items-center text-emerald-500 text-sm font-medium">
       <ArrowUpRight className="w-4 h-4" />
-      {inverted ? change.toFixed(1) : `+${change.toFixed(0)}%`}
+      {showPercent ? `+${Math.abs(change).toFixed(0)}%` : (inverted ? change.toFixed(1) : `+${Math.abs(change).toFixed(0)}`)}
     </span>
   )
   if (isNegative) return (
     <span className="flex items-center text-red-500 text-sm font-medium">
       <ArrowDownRight className="w-4 h-4" />
-      {inverted ? `+${Math.abs(change).toFixed(1)}` : `${change.toFixed(0)}%`}
+      {showPercent ? `${change.toFixed(0)}%` : (inverted ? `+${Math.abs(change).toFixed(1)}` : change.toFixed(0))}
     </span>
   )
   return <Minus className="w-4 h-4 text-muted-foreground" />
+}
+
+// Calculate percentage change
+function calcPercentChange(current: number, previous: number): number | null {
+  if (previous === 0) return current > 0 ? 100 : null
+  return ((current - previous) / previous) * 100
+}
+
+// Predict next value using simple linear trend
+function predictNextValue(values: number[]): number | null {
+  if (values.length < 2) return null
+  const trend = (values[values.length - 1] - values[0]) / (values.length - 1)
+  return Math.max(0, values[values.length - 1] + trend)
 }
 
 export default async function DashboardPage() {
@@ -66,12 +88,41 @@ export default async function DashboardPage() {
     }
   )
 
+  // Date ranges for comparison
+  const now = new Date()
+  const thisMonthStart = startOfMonth(now)
+  const lastMonthStart = startOfMonth(subMonths(now, 1))
+  const lastMonthEnd = new Date(thisMonthStart)
+  lastMonthEnd.setDate(lastMonthEnd.getDate() - 1)
+
   // Fetch all stats in parallel
-  const [keywordsResult, pagesResult, alertsResult, topPagesResult] = await Promise.all([
+  const [
+    keywordsResult,
+    pagesResult,
+    alertsResult,
+    topPagesResult,
+    thisMonthHistoryResult,
+    lastMonthHistoryResult,
+    last3MonthsHistoryResult,
+  ] = await Promise.all([
     supabase.from('keywords').select('id', { count: 'exact', head: true }),
     supabase.from('pages').select('id, position, previous_position, clicks, impressions', { count: 'exact' }),
     supabase.from('alerts').select('id', { count: 'exact', head: true }).eq('status', 'active'),
     supabase.from('pages').select('url, position, clicks, impressions, ctr').order('clicks', { ascending: false, nullsFirst: false }).limit(5),
+    // This month metrics
+    supabase.from('page_metrics_history')
+      .select('clicks, impressions, position')
+      .gte('date', thisMonthStart.toISOString().split('T')[0]),
+    // Last month metrics
+    supabase.from('page_metrics_history')
+      .select('clicks, impressions, position')
+      .gte('date', lastMonthStart.toISOString().split('T')[0])
+      .lt('date', thisMonthStart.toISOString().split('T')[0]),
+    // Last 3 months for predictions (monthly aggregates)
+    supabase.from('page_metrics_history')
+      .select('clicks, impressions, position, date')
+      .gte('date', startOfMonth(subMonths(now, 2)).toISOString().split('T')[0])
+      .order('date', { ascending: true }),
   ])
 
   const totalKeywords = keywordsResult.count || 0
@@ -79,25 +130,80 @@ export default async function DashboardPage() {
   const totalAlerts = alertsResult.count || 0
   const topPages = topPagesResult.data || []
 
-  // Calculate average position and total clicks/impressions
+  // Current metrics from pages table
   const pagesData = pagesResult.data || []
   const pagesWithPosition = pagesData.filter(p => p.position && p.position > 0)
   const avgPosition = pagesWithPosition.length > 0
     ? pagesWithPosition.reduce((sum, p) => sum + (p.position || 0), 0) / pagesWithPosition.length
     : null
 
-  // Calculate position change (comparing current avg to previous avg)
   const pagesWithBothPositions = pagesData.filter(p => p.position && p.previous_position)
   const avgPreviousPosition = pagesWithBothPositions.length > 0
     ? pagesWithBothPositions.reduce((sum, p) => sum + (p.previous_position || 0), 0) / pagesWithBothPositions.length
     : null
   const positionChange = avgPosition && avgPreviousPosition
-    ? avgPreviousPosition - avgPosition // Positive = improved
+    ? avgPreviousPosition - avgPosition
     : null
 
-  // Total clicks and impressions
   const totalClicks = pagesData.reduce((sum, p) => sum + (p.clicks || 0), 0)
   const totalImpressions = pagesData.reduce((sum, p) => sum + (p.impressions || 0), 0)
+
+  // Historical data for month comparison
+  const thisMonthData = thisMonthHistoryResult.data || []
+  const lastMonthData = lastMonthHistoryResult.data || []
+  const hasHistoricalData = thisMonthData.length > 0 || lastMonthData.length > 0
+
+  // Calculate monthly aggregates
+  const thisMonthClicks = thisMonthData.reduce((sum, d) => sum + (d.clicks || 0), 0)
+  const thisMonthImpressions = thisMonthData.reduce((sum, d) => sum + (d.impressions || 0), 0)
+  const thisMonthPositions = thisMonthData.filter(d => d.position && d.position > 0)
+  const thisMonthAvgPosition = thisMonthPositions.length > 0
+    ? thisMonthPositions.reduce((sum, d) => sum + (d.position || 0), 0) / thisMonthPositions.length
+    : null
+
+  const lastMonthClicks = lastMonthData.reduce((sum, d) => sum + (d.clicks || 0), 0)
+  const lastMonthImpressions = lastMonthData.reduce((sum, d) => sum + (d.impressions || 0), 0)
+  const lastMonthPositions = lastMonthData.filter(d => d.position && d.position > 0)
+  const lastMonthAvgPosition = lastMonthPositions.length > 0
+    ? lastMonthPositions.reduce((sum, d) => sum + (d.position || 0), 0) / lastMonthPositions.length
+    : null
+
+  // Calculate changes
+  const clicksChange = lastMonthClicks > 0 ? calcPercentChange(thisMonthClicks, lastMonthClicks) : null
+  const impressionsChange = lastMonthImpressions > 0 ? calcPercentChange(thisMonthImpressions, lastMonthImpressions) : null
+
+  // Predictions (need at least 2 months of data)
+  const last3MonthsData = last3MonthsHistoryResult.data || []
+  const monthlyAggregates: { [key: string]: { clicks: number; impressions: number; positions: number[]; count: number } } = {}
+
+  for (const record of last3MonthsData) {
+    const monthKey = record.date?.substring(0, 7) // YYYY-MM
+    if (!monthKey) continue
+    if (!monthlyAggregates[monthKey]) {
+      monthlyAggregates[monthKey] = { clicks: 0, impressions: 0, positions: [], count: 0 }
+    }
+    monthlyAggregates[monthKey].clicks += record.clicks || 0
+    monthlyAggregates[monthKey].impressions += record.impressions || 0
+    if (record.position && record.position > 0) {
+      monthlyAggregates[monthKey].positions.push(record.position)
+    }
+    monthlyAggregates[monthKey].count++
+  }
+
+  const monthKeys = Object.keys(monthlyAggregates).sort()
+  const clicksHistory = monthKeys.map(k => monthlyAggregates[k].clicks)
+  const impressionsHistory = monthKeys.map(k => monthlyAggregates[k].impressions)
+  const positionHistory = monthKeys.map(k => {
+    const positions = monthlyAggregates[k].positions
+    return positions.length > 0 ? positions.reduce((a, b) => a + b, 0) / positions.length : 0
+  }).filter(p => p > 0)
+
+  const predictedClicks = predictNextValue(clicksHistory)
+  const predictedImpressions = predictNextValue(impressionsHistory)
+  const predictedPosition = predictNextValue(positionHistory)
+  const canPredict = monthKeys.length >= 2
+
+  const nextMonth = format(subMonths(now, -1), 'MMMM yyyy', { locale: fr })
 
   const stats = [
     {
@@ -159,7 +265,7 @@ export default async function DashboardPage() {
                 <div className={`${stat.color} p-2 rounded-lg`}>
                   <Icon className="w-5 h-5 text-white" />
                 </div>
-                <ChangeIndicator change={stat.change} inverted={stat.inverted} />
+                <ChangeIndicator change={stat.change} inverted={stat.inverted} showPercent={false} />
               </div>
               <div className="text-3xl font-bold text-foreground mb-1">{stat.value}</div>
               <div className="text-sm text-muted-foreground">{stat.name}</div>
@@ -168,7 +274,110 @@ export default async function DashboardPage() {
         })}
       </div>
 
-      {/* Secondary stats */}
+      {/* Monthly Comparison & Predictions */}
+      {hasData && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+          {/* This Month vs Last Month */}
+          <div className="bg-card border border-border rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Calendar className="w-5 h-5 text-muted-foreground" />
+              <h3 className="font-semibold text-foreground">Ce mois vs mois dernier</h3>
+            </div>
+            {hasHistoricalData ? (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <MousePointerClick className="w-4 h-4 text-violet-500" />
+                    <span className="text-sm text-muted-foreground">Clics</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-semibold text-foreground">{formatCompactNumber(thisMonthClicks)}</span>
+                    <ChangeIndicator change={clicksChange} />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-pink-500" />
+                    <span className="text-sm text-muted-foreground">Impressions</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-semibold text-foreground">{formatCompactNumber(thisMonthImpressions)}</span>
+                    <ChangeIndicator change={impressionsChange} />
+                  </div>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm text-muted-foreground">Position moy.</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg font-semibold text-foreground">
+                      {thisMonthAvgPosition ? thisMonthAvgPosition.toFixed(1) : '—'}
+                    </span>
+                    {thisMonthAvgPosition && lastMonthAvgPosition && (
+                      <ChangeIndicator change={lastMonthAvgPosition - thisMonthAvgPosition} inverted showPercent={false} />
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <p className="text-sm">Pas encore de donnees historiques.</p>
+                <p className="text-xs mt-1">Importez vos donnees GSC pour voir les comparaisons.</p>
+              </div>
+            )}
+          </div>
+
+          {/* Predictions */}
+          <div className="bg-card border border-border rounded-xl p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles className="w-5 h-5 text-amber-500" />
+              <h3 className="font-semibold text-foreground">Predictions {nextMonth}</h3>
+            </div>
+            {canPredict ? (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <MousePointerClick className="w-4 h-4 text-violet-500" />
+                    <span className="text-sm text-muted-foreground">Clics estimes</span>
+                  </div>
+                  <span className="text-lg font-semibold text-foreground">
+                    ~{formatCompactNumber(predictedClicks)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <Eye className="w-4 h-4 text-pink-500" />
+                    <span className="text-sm text-muted-foreground">Impressions estimees</span>
+                  </div>
+                  <span className="text-lg font-semibold text-foreground">
+                    ~{formatCompactNumber(predictedImpressions)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm text-muted-foreground">Position estimee</span>
+                  </div>
+                  <span className="text-lg font-semibold text-foreground">
+                    ~{predictedPosition ? predictedPosition.toFixed(1) : '—'}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Base sur la tendance des {monthKeys.length} derniers mois
+                </p>
+              </div>
+            ) : (
+              <div className="text-center py-6 text-muted-foreground">
+                <p className="text-sm">Donnees insuffisantes pour les predictions.</p>
+                <p className="text-xs mt-1">Importez des donnees sur au moins 2 mois.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Secondary stats - Totals */}
       {hasData && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
           <div className="bg-card border border-border rounded-xl p-5">
@@ -178,7 +387,7 @@ export default async function DashboardPage() {
               </div>
               <div>
                 <div className="text-2xl font-bold text-foreground">{formatNumber(totalClicks)}</div>
-                <div className="text-sm text-muted-foreground">Clics totaux</div>
+                <div className="text-sm text-muted-foreground">Clics totaux (cumul)</div>
               </div>
             </div>
           </div>
@@ -189,7 +398,7 @@ export default async function DashboardPage() {
               </div>
               <div>
                 <div className="text-2xl font-bold text-foreground">{formatNumber(totalImpressions)}</div>
-                <div className="text-sm text-muted-foreground">Impressions totales</div>
+                <div className="text-sm text-muted-foreground">Impressions totales (cumul)</div>
               </div>
             </div>
           </div>
@@ -265,15 +474,15 @@ export default async function DashboardPage() {
           <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
             <Key className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">Aucune donnée</h3>
+          <h3 className="text-lg font-semibold text-foreground mb-2">Aucune donnee</h3>
           <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-            Commencez par importer vos données SEO depuis Google Search Console.
+            Commencez par importer vos donnees SEO depuis Google Search Console.
           </p>
           <Link
             href="/ogs/app/import"
             className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
           >
-            Importer des données
+            Importer des donnees
             <ArrowUpRight className="w-4 h-4" />
           </Link>
         </div>
