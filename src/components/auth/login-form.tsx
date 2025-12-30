@@ -12,7 +12,7 @@ export function LoginForm() {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirectTo') || '/ogs/app'
+  const redirectTo = searchParams.get('redirectTo')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -32,7 +32,10 @@ export function LoginForm() {
       return
     }
 
-    router.push(redirectTo)
+    // Si redirectTo est spécifié, on redirige, sinon on reste sur la page
+    if (redirectTo) {
+      router.push(redirectTo)
+    }
     router.refresh()
   }
 

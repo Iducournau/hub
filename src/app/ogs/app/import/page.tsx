@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Upload, FileSpreadsheet, Globe, BarChart3, Check, AlertCircle } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { Upload, FileSpreadsheet, Globe, BarChart3, Check, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const importSources = [
@@ -11,7 +11,8 @@ const importSources = [
     description: 'Positions, clicks, impressions, CTR',
     icon: Globe,
     color: 'bg-green-600',
-    format: 'CSV exporté depuis GSC'
+    format: 'CSV exporté depuis GSC',
+    enabled: true,
   },
   {
     id: 'semrush',
@@ -19,7 +20,8 @@ const importSources = [
     description: 'Keywords, volumes, difficulty',
     icon: BarChart3,
     color: 'bg-orange-600',
-    format: 'Export Organic Research'
+    format: 'Export Organic Research',
+    enabled: false,
   },
   {
     id: 'screaming',
@@ -27,13 +29,29 @@ const importSources = [
     description: 'URLs, titles, meta, status',
     icon: FileSpreadsheet,
     color: 'bg-yellow-600',
-    format: 'Internal All export'
+    format: 'Internal All export',
+    enabled: false,
   },
 ]
+
+interface ImportResult {
+  success: boolean
+  stats?: {
+    keywords_created: number
+    keywords_existing: number
+    positions_created: number
+  }
+  error?: string
+  errors?: string[]
+}
 
 export default function ImportPage() {
   const [selectedSource, setSelectedSource] = useState<string | null>(null)
   const [dragActive, setDragActive] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
+  const [result, setResult] = useState<ImportResult | null>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault()
@@ -49,9 +67,62 @@ export default function ImportPage() {
     e.preventDefault()
     e.stopPropagation()
     setDragActive(false)
-    // TODO: Handle file drop
-    console.log('Files dropped:', e.dataTransfer.files)
+
+    const files = e.dataTransfer.files
+    if (files && files[0]) {
+      handleFileSelect(files[0])
+    }
   }
+
+  const handleFileSelect = (file: File) => {
+    if (!file.name.endsWith('.csv')) {
+      setResult({ success: false, error: 'Le fichier doit être au format CSV' })
+      return
+    }
+    setSelectedFile(file)
+    setResult(null)
+  }
+
+  const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      handleFileSelect(file)
+    }
+  }
+
+  const handleUpload = async () => {
+    if (!selectedFile || !selectedSource) return
+
+    setIsUploading(true)
+    setResult(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('file', selectedFile)
+
+      const response = await fetch(`/api/import/${selectedSource}`, {
+        method: 'POST',
+        body: formData,
+      })
+
+      const data: ImportResult = await response.json()
+      setResult(data)
+
+      if (data.success) {
+        setSelectedFile(null)
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+      }
+    } catch {
+      setResult({ success: false, error: 'Erreur de connexion au serveur' })
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const selectedSourceData = importSources.find(s => s.id === selectedSource)
+  const canUpload = selectedSource && selectedFile && selectedSourceData?.enabled
 
   return (
     <div className="p-6">
@@ -73,12 +144,16 @@ export default function ImportPage() {
             return (
               <button
                 key={source.id}
-                onClick={() => setSelectedSource(source.id)}
+                onClick={() => {
+                  setSelectedSource(source.id)
+                  setResult(null)
+                }}
                 className={cn(
-                  'p-4 rounded-xl border text-left transition-all',
+                  'p-4 rounded-xl border text-left transition-all relative',
                   isSelected
                     ? 'bg-blue-600/20 border-blue-500'
-                    : 'bg-card border-border hover:border-ring'
+                    : 'bg-card border-border hover:border-ring',
+                  !source.enabled && 'opacity-60'
                 )}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -94,6 +169,11 @@ export default function ImportPage() {
                 <h3 className="font-semibold text-foreground mb-1">{source.name}</h3>
                 <p className="text-sm text-muted-foreground mb-2">{source.description}</p>
                 <p className="text-xs text-muted-foreground/70">{source.format}</p>
+                {!source.enabled && (
+                  <span className="absolute top-2 right-2 text-xs bg-muted text-muted-foreground px-2 py-0.5 rounded">
+                    Bientôt
+                  </span>
+                )}
               </button>
             )
           })}
@@ -120,39 +200,121 @@ export default function ImportPage() {
           <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
             <Upload className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-foreground mb-2">
-            Glissez votre fichier ici
-          </h3>
-          <p className="text-muted-foreground mb-4">
-            ou cliquez pour sélectionner un fichier CSV
-          </p>
+
+          {selectedFile ? (
+            <>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                {selectedFile.name}
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                {(selectedFile.size / 1024).toFixed(1)} Ko
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                Glissez votre fichier ici
+              </h3>
+              <p className="text-muted-foreground mb-4">
+                ou cliquez pour sélectionner un fichier CSV
+              </p>
+            </>
+          )}
+
           <input
+            ref={fileInputRef}
             type="file"
             accept=".csv"
             className="hidden"
             id="file-upload"
+            onChange={handleFileInputChange}
           />
-          <label
-            htmlFor="file-upload"
-            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors"
-          >
-            <Upload className="w-4 h-4" />
-            Sélectionner un fichier
-          </label>
+
+          <div className="flex items-center justify-center gap-3">
+            <label
+              htmlFor="file-upload"
+              className="inline-flex items-center gap-2 bg-card border border-border hover:bg-accent text-foreground font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors"
+            >
+              Sélectionner un fichier
+            </label>
+
+            {canUpload && (
+              <button
+                onClick={handleUpload}
+                disabled={isUploading}
+                className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+              >
+                {isUploading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Import en cours...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    Importer
+                  </>
+                )}
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Info */}
-      <div className="mt-8 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
-        <div>
-          <h4 className="font-medium text-amber-600 dark:text-amber-400 mb-1">Import non disponible</h4>
-          <p className="text-sm text-muted-foreground">
-            La fonctionnalité d&apos;import sera disponible une fois la base de données Supabase configurée.
-            Les parsers CSV seront développés en Semaine 2.
-          </p>
+      {/* Result */}
+      {result && (
+        <div className={cn(
+          'mt-6 rounded-xl p-4 flex items-start gap-3',
+          result.success
+            ? 'bg-emerald-500/10 border border-emerald-500/30'
+            : 'bg-red-500/10 border border-red-500/30'
+        )}>
+          {result.success ? (
+            <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0 mt-0.5" />
+          ) : (
+            <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          )}
+          <div>
+            {result.success ? (
+              <>
+                <h4 className="font-medium text-emerald-600 dark:text-emerald-400 mb-1">
+                  Import réussi
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {result.stats?.keywords_created} nouveaux mots-clés, {' '}
+                  {result.stats?.keywords_existing} existants, {' '}
+                  {result.stats?.positions_created} positions enregistrées
+                </p>
+              </>
+            ) : (
+              <>
+                <h4 className="font-medium text-red-600 dark:text-red-400 mb-1">
+                  Erreur d&apos;import
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  {result.error}
+                </p>
+              </>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Info for disabled sources */}
+      {selectedSource && !selectedSourceData?.enabled && (
+        <div className="mt-6 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <h4 className="font-medium text-amber-600 dark:text-amber-400 mb-1">
+              Import non disponible
+            </h4>
+            <p className="text-sm text-muted-foreground">
+              L&apos;import {selectedSourceData?.name} sera disponible prochainement.
+              Seul Google Search Console est actif pour le moment.
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
