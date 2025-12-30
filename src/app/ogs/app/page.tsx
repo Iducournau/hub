@@ -10,7 +10,7 @@ const stats = [
     value: '—',
     change: null,
     icon: Key,
-    color: 'bg-indigo-600'
+    color: 'bg-blue-600'
   },
   {
     name: 'Pages indexées',
@@ -36,20 +36,20 @@ const stats = [
 ]
 
 function ChangeIndicator({ change }: { change: number | null }) {
-  if (change === null) return <Minus className="w-4 h-4 text-slate-500" />
+  if (change === null) return <Minus className="w-4 h-4 text-muted-foreground" />
   if (change > 0) return (
-    <span className="flex items-center text-emerald-400 text-sm">
+    <span className="flex items-center text-emerald-500 text-sm">
       <ArrowUpRight className="w-4 h-4" />
       +{change}%
     </span>
   )
   if (change < 0) return (
-    <span className="flex items-center text-red-400 text-sm">
+    <span className="flex items-center text-red-500 text-sm">
       <ArrowDownRight className="w-4 h-4" />
       {change}%
     </span>
   )
-  return <Minus className="w-4 h-4 text-slate-500" />
+  return <Minus className="w-4 h-4 text-muted-foreground" />
 }
 
 export default function DashboardPage() {
@@ -57,8 +57,8 @@ export default function DashboardPage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-2">Dashboard</h1>
-        <p className="text-slate-400">Vue d&apos;ensemble de vos performances SEO</p>
+        <h1 className="text-2xl font-bold text-foreground mb-2">Dashboard</h1>
+        <p className="text-muted-foreground">Vue d&apos;ensemble de vos performances SEO</p>
       </div>
 
       {/* KPI Cards */}
@@ -68,7 +68,7 @@ export default function DashboardPage() {
           return (
             <div
               key={stat.name}
-              className="bg-slate-800/50 border border-slate-700 rounded-xl p-5"
+              className="bg-card border border-border rounded-xl p-5"
             >
               <div className="flex items-center justify-between mb-3">
                 <div className={`${stat.color} p-2 rounded-lg`}>
@@ -76,25 +76,25 @@ export default function DashboardPage() {
                 </div>
                 <ChangeIndicator change={stat.change} />
               </div>
-              <div className="text-3xl font-bold text-white mb-1">{stat.value}</div>
-              <div className="text-sm text-slate-400">{stat.name}</div>
+              <div className="text-3xl font-bold text-foreground mb-1">{stat.value}</div>
+              <div className="text-sm text-muted-foreground">{stat.name}</div>
             </div>
           )
         })}
       </div>
 
       {/* Empty state */}
-      <div className="bg-slate-800/30 border border-dashed border-slate-700 rounded-xl p-12 text-center">
-        <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-          <Key className="w-8 h-8 text-slate-500" />
+      <div className="bg-muted/30 border border-dashed border-border rounded-xl p-12 text-center">
+        <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+          <Key className="w-8 h-8 text-muted-foreground" />
         </div>
-        <h3 className="text-lg font-semibold text-white mb-2">Aucune donnée</h3>
-        <p className="text-slate-400 mb-4 max-w-md mx-auto">
+        <h3 className="text-lg font-semibold text-foreground mb-2">Aucune donnée</h3>
+        <p className="text-muted-foreground mb-4 max-w-md mx-auto">
           Commencez par importer vos données SEO depuis Google Search Console, SEMrush ou Screaming Frog.
         </p>
         <a
           href="/ogs/app/import"
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg transition-colors"
+          className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg transition-colors"
         >
           Importer des données
           <ArrowUpRight className="w-4 h-4" />

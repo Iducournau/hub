@@ -21,7 +21,7 @@ export function LogoutButton({ className }: LogoutButtonProps) {
   return (
     <button
       onClick={handleLogout}
-      className={className || 'flex items-center gap-2 text-slate-400 hover:text-white transition-colors'}
+      className={className || 'flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors'}
     >
       <LogOut className="w-4 h-4" />
       <span>Déconnexion</span>

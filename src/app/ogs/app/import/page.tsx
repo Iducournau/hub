@@ -57,13 +57,13 @@ export default function ImportPage() {
     <div className="p-6">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white mb-2">Import de données</h1>
-        <p className="text-slate-400">Importez vos données SEO depuis vos outils favoris</p>
+        <h1 className="text-2xl font-bold text-foreground mb-2">Import de données</h1>
+        <p className="text-muted-foreground">Importez vos données SEO depuis vos outils favoris</p>
       </div>
 
       {/* Source Selection */}
       <div className="mb-8">
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
           1. Sélectionnez la source
         </h2>
         <div className="grid md:grid-cols-3 gap-4">
@@ -77,8 +77,8 @@ export default function ImportPage() {
                 className={cn(
                   'p-4 rounded-xl border text-left transition-all',
                   isSelected
-                    ? 'bg-indigo-600/20 border-indigo-500'
-                    : 'bg-slate-800/50 border-slate-700 hover:border-slate-600'
+                    ? 'bg-blue-600/20 border-blue-500'
+                    : 'bg-card border-border hover:border-ring'
                 )}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -86,14 +86,14 @@ export default function ImportPage() {
                     <Icon className="w-5 h-5 text-white" />
                   </div>
                   {isSelected && (
-                    <div className="bg-indigo-600 p-1 rounded-full">
+                    <div className="bg-blue-600 p-1 rounded-full">
                       <Check className="w-3 h-3 text-white" />
                     </div>
                   )}
                 </div>
-                <h3 className="font-semibold text-white mb-1">{source.name}</h3>
-                <p className="text-sm text-slate-400 mb-2">{source.description}</p>
-                <p className="text-xs text-slate-500">{source.format}</p>
+                <h3 className="font-semibold text-foreground mb-1">{source.name}</h3>
+                <p className="text-sm text-muted-foreground mb-2">{source.description}</p>
+                <p className="text-xs text-muted-foreground/70">{source.format}</p>
               </button>
             )
           })}
@@ -102,7 +102,7 @@ export default function ImportPage() {
 
       {/* File Upload */}
       <div className={cn('transition-opacity', !selectedSource && 'opacity-50 pointer-events-none')}>
-        <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-4">
+        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-4">
           2. Uploadez votre fichier CSV
         </h2>
         <div
@@ -113,17 +113,17 @@ export default function ImportPage() {
           className={cn(
             'border-2 border-dashed rounded-xl p-12 text-center transition-colors',
             dragActive
-              ? 'border-indigo-500 bg-indigo-500/10'
-              : 'border-slate-700 bg-slate-800/30'
+              ? 'border-blue-500 bg-blue-500/10'
+              : 'border-border bg-muted/30'
           )}
         >
-          <div className="bg-slate-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Upload className="w-8 h-8 text-slate-500" />
+          <div className="bg-muted w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+            <Upload className="w-8 h-8 text-muted-foreground" />
           </div>
-          <h3 className="text-lg font-semibold text-white mb-2">
+          <h3 className="text-lg font-semibold text-foreground mb-2">
             Glissez votre fichier ici
           </h3>
-          <p className="text-slate-400 mb-4">
+          <p className="text-muted-foreground mb-4">
             ou cliquez pour sélectionner un fichier CSV
           </p>
           <input
@@ -134,7 +134,7 @@ export default function ImportPage() {
           />
           <label
             htmlFor="file-upload"
-            className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors"
+            className="inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded-lg cursor-pointer transition-colors"
           >
             <Upload className="w-4 h-4" />
             Sélectionner un fichier
@@ -144,10 +144,10 @@ export default function ImportPage() {
 
       {/* Info */}
       <div className="mt-8 bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-        <AlertCircle className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+        <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
         <div>
-          <h4 className="font-medium text-amber-400 mb-1">Import non disponible</h4>
-          <p className="text-sm text-slate-400">
+          <h4 className="font-medium text-amber-600 dark:text-amber-400 mb-1">Import non disponible</h4>
+          <p className="text-sm text-muted-foreground">
             La fonctionnalité d&apos;import sera disponible une fois la base de données Supabase configurée.
             Les parsers CSV seront développés en Semaine 2.
           </p>
