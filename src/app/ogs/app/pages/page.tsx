@@ -83,6 +83,8 @@ export default async function PagesPage({
     clicks?: string
     ctr?: string
     formation?: string
+    from?: string
+    to?: string
   }>
 }) {
   const params = await searchParams
@@ -112,6 +114,8 @@ export default async function PagesPage({
   const clicks = params.clicks || ''
   const ctr = params.ctr || ''
   const formation = params.formation || ''
+  const fromDate = params.from || ''
+  const toDate = params.to || ''
   const page = parseInt(params.page || '1', 10)
   const sort = params.sort || 'position'
   const perPage = 50
@@ -179,7 +183,7 @@ export default async function PagesPage({
 
   const totalCount = count || 0
   const totalPages = Math.ceil(totalCount / perPage)
-  const hasActiveFilters = pos || clicks || ctr || formation
+  const hasActiveFilters = pos || clicks || ctr || formation || fromDate
 
   // Build pagination URL
   const buildPaginationUrl = (newPage: number) => {
@@ -189,6 +193,8 @@ export default async function PagesPage({
     if (clicks) params.set('clicks', clicks)
     if (ctr) params.set('ctr', ctr)
     if (formation) params.set('formation', formation)
+    if (fromDate) params.set('from', fromDate)
+    if (toDate) params.set('to', toDate)
     if (sort !== 'position') params.set('sort', sort)
     params.set('page', newPage.toString())
     return `/ogs/app/pages?${params.toString()}`
@@ -215,6 +221,8 @@ export default async function PagesPage({
         initialCtr={ctr}
         initialFormation={formation}
         formations={formations}
+        initialFrom={fromDate}
+        initialTo={toDate}
       />
 
       {/* Table */}

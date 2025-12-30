@@ -92,6 +92,8 @@ export default async function KeywordsPage({
     pos?: string
     clicks?: string
     quickwins?: string
+    from?: string
+    to?: string
   }>
 }) {
   const params = await searchParams
@@ -122,6 +124,8 @@ export default async function KeywordsPage({
   const pos = params.pos || ''
   const clicks = params.clicks || ''
   const quickwins = params.quickwins === '1'
+  const fromDate = params.from || ''
+  const toDate = params.to || ''
   const page = parseInt(params.page || '1', 10)
   const perPage = 50
 
@@ -161,9 +165,30 @@ export default async function KeywordsPage({
     console.error('Error fetching keywords:', error)
   }
 
+  // Helper to filter positions by date range
+  const filterPositionsByDate = (positions: PositionData[] | null): PositionData[] => {
+    if (!positions || positions.length === 0) return []
+    if (!fromDate || !toDate) return positions
+
+    const from = new Date(fromDate)
+    const to = new Date(toDate)
+    to.setHours(23, 59, 59, 999) // Include the entire end day
+
+    return positions.filter(p => {
+      const posDate = new Date(p.date)
+      return posDate >= from && posDate <= to
+    })
+  }
+
   // Apply position/clicks filters client-side (on positions data)
   if (keywords) {
-    keywords = keywords.filter((kw) => {
+    keywords = keywords.map(kw => ({
+      ...kw,
+      positions: filterPositionsByDate(kw.positions),
+    })).filter((kw) => {
+      // If date filter is active, only keep keywords with positions in that range
+      if (fromDate && toDate && kw.positions.length === 0) return false
+
       const latestPos = getLatestPosition(kw.positions)
 
       // Position filter
@@ -204,11 +229,13 @@ export default async function KeywordsPage({
     if (pos) params.set('pos', pos)
     if (clicks) params.set('clicks', clicks)
     if (quickwins) params.set('quickwins', '1')
+    if (fromDate) params.set('from', fromDate)
+    if (toDate) params.set('to', toDate)
     params.set('page', newPage.toString())
     return `/ogs/app/keywords?${params.toString()}`
   }
 
-  const hasActiveFilters = priority || pos || clicks || quickwins
+  const hasActiveFilters = priority || pos || clicks || quickwins || fromDate
 
   return (
     <div className="p-6">
@@ -230,6 +257,8 @@ export default async function KeywordsPage({
         initialPosition={pos}
         initialClicks={clicks}
         initialQuickWins={quickwins}
+        initialFrom={fromDate}
+        initialTo={toDate}
       />
 
       {/* Table */}

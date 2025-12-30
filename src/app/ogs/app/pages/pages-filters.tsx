@@ -10,6 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DateRangePicker,
+  DateRange,
+  formatDateForUrl,
+  parseDateFromUrl,
+  getDefaultDateRange,
+} from '@/components/ui/date-range-picker'
 
 interface PagesFiltersProps {
   initialSearch: string
@@ -18,6 +25,8 @@ interface PagesFiltersProps {
   initialCtr: string
   initialFormation: string
   formations: string[]
+  initialFrom: string
+  initialTo: string
 }
 
 export function PagesFilters({
@@ -27,11 +36,19 @@ export function PagesFilters({
   initialCtr,
   initialFormation,
   formations,
+  initialFrom,
+  initialTo,
 }: PagesFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState(initialSearch)
+
+  // Initialize date range from URL params or default
+  const initialDateRange: DateRange | null = initialFrom && initialTo
+    ? { from: parseDateFromUrl(initialFrom)!, to: parseDateFromUrl(initialTo)! }
+    : getDefaultDateRange()
+  const [dateRange, setDateRange] = useState<DateRange | null>(initialDateRange)
 
   const updateFilters = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -57,6 +74,18 @@ export function PagesFilters({
     updateFilters({ q: value || null })
   }
 
+  const handleDateRangeChange = (range: DateRange | null) => {
+    setDateRange(range)
+    if (range) {
+      updateFilters({
+        from: formatDateForUrl(range.from),
+        to: formatDateForUrl(range.to),
+      })
+    } else {
+      updateFilters({ from: null, to: null })
+    }
+  }
+
   return (
     <div className="space-y-3 mb-6">
       {/* Search */}
@@ -77,7 +106,13 @@ export function PagesFilters({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Date Range */}
+        <DateRangePicker
+          value={dateRange}
+          onChange={handleDateRangeChange}
+        />
+
         {/* Position */}
         <Select
           value={initialPosition || 'all'}

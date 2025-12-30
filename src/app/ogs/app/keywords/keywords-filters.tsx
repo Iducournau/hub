@@ -10,6 +10,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  DateRangePicker,
+  DateRange,
+  formatDateForUrl,
+  parseDateFromUrl,
+  getDefaultDateRange,
+} from '@/components/ui/date-range-picker'
 import { cn } from '@/lib/utils'
 
 interface KeywordsFiltersProps {
@@ -18,6 +25,8 @@ interface KeywordsFiltersProps {
   initialPosition: string
   initialClicks: string
   initialQuickWins: boolean
+  initialFrom: string
+  initialTo: string
 }
 
 export function KeywordsFilters({
@@ -26,11 +35,19 @@ export function KeywordsFilters({
   initialPosition,
   initialClicks,
   initialQuickWins,
+  initialFrom,
+  initialTo,
 }: KeywordsFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState(initialSearch)
+
+  // Initialize date range from URL params or default
+  const initialDateRange: DateRange | null = initialFrom && initialTo
+    ? { from: parseDateFromUrl(initialFrom)!, to: parseDateFromUrl(initialTo)! }
+    : getDefaultDateRange()
+  const [dateRange, setDateRange] = useState<DateRange | null>(initialDateRange)
 
   const updateFilters = useCallback((updates: Record<string, string | null>) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -56,6 +73,18 @@ export function KeywordsFilters({
     updateFilters({ q: value || null })
   }
 
+  const handleDateRangeChange = (range: DateRange | null) => {
+    setDateRange(range)
+    if (range) {
+      updateFilters({
+        from: formatDateForUrl(range.from),
+        to: formatDateForUrl(range.to),
+      })
+    } else {
+      updateFilters({ from: null, to: null })
+    }
+  }
+
   return (
     <div className="space-y-3 mb-6">
       {/* Search */}
@@ -76,7 +105,13 @@ export function KeywordsFilters({
       </div>
 
       {/* Filters */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
+        {/* Date Range */}
+        <DateRangePicker
+          value={dateRange}
+          onChange={handleDateRangeChange}
+        />
+
         {/* Priority */}
         <Select
           value={initialPriority || 'all'}
