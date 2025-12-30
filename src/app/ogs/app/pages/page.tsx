@@ -1,8 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { FileText, ExternalLink } from 'lucide-react'
+import { FileText, ExternalLink, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { PagesSearch } from './pages-search'
+import { PagesFilters } from './pages-filters'
 
 interface PageData {
   id: string
@@ -12,6 +12,8 @@ interface PageData {
   impressions: number | null
   ctr: number | null
   position: number | null
+  previous_position: number | null
+  formation: string | null
 }
 
 // Position badge color
@@ -39,10 +41,49 @@ function getPath(url: string) {
   }
 }
 
+// Position delta component
+function PositionDelta({ current, previous }: { current: number | null; previous: number | null }) {
+  if (!current || !previous) return null
+
+  const delta = previous - current // Positive = improved (lower position is better)
+
+  if (delta === 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-muted-foreground text-xs">
+        <Minus className="w-3 h-3" />
+      </span>
+    )
+  }
+
+  if (delta > 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+        <TrendingUp className="w-3 h-3" />
+        +{delta.toFixed(0)}
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-0.5 text-red-600 dark:text-red-400 text-xs font-medium">
+      <TrendingDown className="w-3 h-3" />
+      {delta.toFixed(0)}
+    </span>
+  )
+}
+
 export default async function PagesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; sort?: string }>
+  searchParams: Promise<{
+    q?: string
+    page?: string
+    sort?: string
+    pos?: string
+    clicks?: string
+    ctr?: string
+    formation?: string
+  }>
 }) {
   const params = await searchParams
   const cookieStore = await cookies()
@@ -67,20 +108,67 @@ export default async function PagesPage({
     }
   )
   const search = params.q || ''
+  const pos = params.pos || ''
+  const clicks = params.clicks || ''
+  const ctr = params.ctr || ''
+  const formation = params.formation || ''
   const page = parseInt(params.page || '1', 10)
-  const sort = params.sort || 'clicks'
+  const sort = params.sort || 'position'
   const perPage = 50
 
-  // Fetch pages
+  // Fetch distinct formations for filter
+  const { data: formationsData } = await supabase
+    .from('pages')
+    .select('formation')
+    .not('formation', 'is', null)
+    .order('formation')
+
+  const formations = [...new Set(formationsData?.map(f => f.formation).filter(Boolean) || [])] as string[]
+
+  // Fetch pages - position: ascending (best first), others: descending
+  const isPositionSort = sort === 'position'
   let query = supabase
     .from('pages')
     .select('*', { count: 'exact' })
-    .order(sort, { ascending: false, nullsFirst: false })
-    .range((page - 1) * perPage, page * perPage - 1)
+    .order(sort, { ascending: isPositionSort, nullsFirst: false })
 
+  // Search filter
   if (search) {
     query = query.ilike('url', `%${search}%`)
   }
+
+  // Position filter
+  if (pos && pos !== 'all') {
+    if (pos === 'top3') {
+      query = query.lte('position', 3).gt('position', 0)
+    } else if (pos === 'top10') {
+      query = query.lte('position', 10).gt('position', 0)
+    } else if (pos === 'top20') {
+      query = query.lte('position', 20).gt('position', 0)
+    } else if (pos === 'below20') {
+      query = query.gt('position', 20)
+    }
+  }
+
+  // Clicks filter
+  if (clicks && clicks !== 'all') {
+    const minClicks = parseInt(clicks, 10)
+    query = query.gte('clicks', minClicks)
+  }
+
+  // CTR filter
+  if (ctr && ctr !== 'all') {
+    const minCtr = parseFloat(ctr) / 100
+    query = query.gte('ctr', minCtr)
+  }
+
+  // Formation filter
+  if (formation && formation !== 'all') {
+    query = query.eq('formation', formation)
+  }
+
+  // Apply pagination after filters
+  query = query.range((page - 1) * perPage, page * perPage - 1)
 
   const { data, count, error } = await query
   const pages = data as PageData[] | null
@@ -89,7 +177,22 @@ export default async function PagesPage({
     console.error('Error fetching pages:', error)
   }
 
-  const totalPages = Math.ceil((count || 0) / perPage)
+  const totalCount = count || 0
+  const totalPages = Math.ceil(totalCount / perPage)
+  const hasActiveFilters = pos || clicks || ctr || formation
+
+  // Build pagination URL
+  const buildPaginationUrl = (newPage: number) => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (pos) params.set('pos', pos)
+    if (clicks) params.set('clicks', clicks)
+    if (ctr) params.set('ctr', ctr)
+    if (formation) params.set('formation', formation)
+    if (sort !== 'position') params.set('sort', sort)
+    params.set('page', newPage.toString())
+    return `/ogs/app/pages?${params.toString()}`
+  }
 
   return (
     <div className="p-6">
@@ -98,13 +201,21 @@ export default async function PagesPage({
         <div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Pages</h1>
           <p className="text-muted-foreground">
-            {count ? `${count.toLocaleString('fr-FR')} pages` : 'Chargement...'}
+            {totalCount.toLocaleString('fr-FR')} pages
+            {hasActiveFilters && ' (filtré)'}
           </p>
         </div>
       </div>
 
-      {/* Search */}
-      <PagesSearch initialSearch={search} />
+      {/* Filters */}
+      <PagesFilters
+        initialSearch={search}
+        initialPosition={pos}
+        initialClicks={clicks}
+        initialCtr={ctr}
+        initialFormation={formation}
+        formations={formations}
+      />
 
       {/* Table */}
       {pages && pages.length > 0 ? (
@@ -139,12 +250,15 @@ export default async function PagesPage({
                       </div>
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className={cn(
-                        'inline-flex items-center px-2 py-1 rounded-md text-sm font-medium',
-                        getPositionColor(p.position)
-                      )}>
-                        {p.position?.toFixed(1) || '—'}
-                      </span>
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span className={cn(
+                          'inline-flex items-center px-2 py-1 rounded-md text-sm font-medium',
+                          getPositionColor(p.position)
+                        )}>
+                          {p.position?.toFixed(1) || '—'}
+                        </span>
+                        <PositionDelta current={p.position} previous={p.previous_position} />
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-right text-sm text-foreground">
                       {formatNumber(p.clicks)}
@@ -170,7 +284,7 @@ export default async function PagesPage({
               <div className="flex gap-2">
                 {page > 1 && (
                   <a
-                    href={`/ogs/app/pages?q=${search}&page=${page - 1}&sort=${sort}`}
+                    href={buildPaginationUrl(page - 1)}
                     className="px-3 py-1.5 bg-card border border-border rounded-lg text-sm hover:bg-accent transition-colors"
                   >
                     Précédent
@@ -178,7 +292,7 @@ export default async function PagesPage({
                 )}
                 {page < totalPages && (
                   <a
-                    href={`/ogs/app/pages?q=${search}&page=${page + 1}&sort=${sort}`}
+                    href={buildPaginationUrl(page + 1)}
                     className="px-3 py-1.5 bg-card border border-border rounded-lg text-sm hover:bg-accent transition-colors"
                   >
                     Suivant
@@ -195,15 +309,15 @@ export default async function PagesPage({
             <FileText className="w-8 h-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">
-            {search ? 'Aucun résultat' : 'Aucune page'}
+            {hasActiveFilters || search ? 'Aucun résultat' : 'Aucune page'}
           </h3>
           <p className="text-muted-foreground mb-4">
-            {search
-              ? `Aucune page ne correspond à "${search}"`
+            {hasActiveFilters || search
+              ? 'Aucune page ne correspond aux filtres sélectionnés.'
               : 'Importez vos données pour voir vos pages ici.'
             }
           </p>
-          {!search && (
+          {!search && !hasActiveFilters && (
             <a
               href="/ogs/app/import"
               className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium"

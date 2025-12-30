@@ -1,8 +1,8 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
-import { Key } from 'lucide-react'
+import { Key, TrendingUp, TrendingDown, Minus } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { KeywordsSearch } from './keywords-search'
+import { KeywordsFilters } from './keywords-filters'
 
 interface PositionData {
   position: number | null
@@ -36,10 +36,63 @@ function formatNumber(num: number | null) {
   return num.toLocaleString('fr-FR')
 }
 
+// Get latest and previous positions from positions array
+function getPositionData(positions: PositionData[] | null) {
+  if (!positions || positions.length === 0) return { latest: null, previous: null }
+  const sorted = [...positions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+  return {
+    latest: sorted[0] || null,
+    previous: sorted[1] || null,
+  }
+}
+
+// Legacy function for backwards compatibility in filters
+function getLatestPosition(positions: PositionData[] | null) {
+  return getPositionData(positions).latest
+}
+
+// Position delta component for keywords
+function PositionDelta({ current, previous }: { current: number | null; previous: number | null }) {
+  if (!current || !previous) return null
+
+  const delta = previous - current // Positive = improved (lower position is better)
+
+  if (Math.abs(delta) < 0.5) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-muted-foreground text-xs">
+        <Minus className="w-3 h-3" />
+      </span>
+    )
+  }
+
+  if (delta > 0) {
+    return (
+      <span className="inline-flex items-center gap-0.5 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+        <TrendingUp className="w-3 h-3" />
+        +{delta.toFixed(0)}
+      </span>
+    )
+  }
+
+  return (
+    <span className="inline-flex items-center gap-0.5 text-red-600 dark:text-red-400 text-xs font-medium">
+      <TrendingDown className="w-3 h-3" />
+      {delta.toFixed(0)}
+    </span>
+  )
+}
+
 export default async function KeywordsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string }>
+  searchParams: Promise<{
+    q?: string
+    page?: string
+    priority?: string
+    pos?: string
+    clicks?: string
+    quickwins?: string
+  }>
 }) {
   const params = await searchParams
   const cookieStore = await cookies()
@@ -63,11 +116,16 @@ export default async function KeywordsPage({
       },
     }
   )
+
   const search = params.q || ''
+  const priority = params.priority || ''
+  const pos = params.pos || ''
+  const clicks = params.clicks || ''
+  const quickwins = params.quickwins === '1'
   const page = parseInt(params.page || '1', 10)
   const perPage = 50
 
-  // Fetch keywords with latest position
+  // Fetch keywords with positions
   let query = supabase
     .from('keywords')
     .select(`
@@ -83,22 +141,74 @@ export default async function KeywordsPage({
         ctr,
         date
       )
-    `, { count: 'exact' })
+    `)
     .order('keyword', { ascending: true })
-    .range((page - 1) * perPage, page * perPage - 1)
 
+  // Filter by search
   if (search) {
     query = query.ilike('keyword', `%${search}%`)
   }
 
-  const { data, count, error } = await query
-  const keywords = data as KeywordData[] | null
+  // Filter by priority (direct column)
+  if (priority && priority !== 'all') {
+    query = query.eq('priority', priority)
+  }
+
+  const { data, error } = await query
+  let keywords = data as KeywordData[] | null
 
   if (error) {
     console.error('Error fetching keywords:', error)
   }
 
-  const totalPages = Math.ceil((count || 0) / perPage)
+  // Apply position/clicks filters client-side (on positions data)
+  if (keywords) {
+    keywords = keywords.filter((kw) => {
+      const latestPos = getLatestPosition(kw.positions)
+
+      // Position filter
+      if (pos && pos !== 'all') {
+        if (!latestPos?.position) return false
+        if (pos === 'top3' && latestPos.position > 3) return false
+        if (pos === 'top10' && latestPos.position > 10) return false
+        if (pos === 'top20' && latestPos.position > 20) return false
+        if (pos === 'below20' && latestPos.position <= 20) return false
+      }
+
+      // Clicks filter
+      if (clicks && clicks !== 'all') {
+        const minClicks = parseInt(clicks, 10)
+        if (!latestPos?.clicks || latestPos.clicks < minClicks) return false
+      }
+
+      // Quick Wins filter (position 4-10)
+      if (quickwins) {
+        if (!latestPos?.position) return false
+        if (latestPos.position < 4 || latestPos.position > 10) return false
+      }
+
+      return true
+    })
+  }
+
+  // Pagination
+  const totalCount = keywords?.length || 0
+  const totalPages = Math.ceil(totalCount / perPage)
+  const paginatedKeywords = keywords?.slice((page - 1) * perPage, page * perPage) || []
+
+  // Build pagination URL
+  const buildPaginationUrl = (newPage: number) => {
+    const params = new URLSearchParams()
+    if (search) params.set('q', search)
+    if (priority) params.set('priority', priority)
+    if (pos) params.set('pos', pos)
+    if (clicks) params.set('clicks', clicks)
+    if (quickwins) params.set('quickwins', '1')
+    params.set('page', newPage.toString())
+    return `/ogs/app/keywords?${params.toString()}`
+  }
+
+  const hasActiveFilters = priority || pos || clicks || quickwins
 
   return (
     <div className="p-6">
@@ -107,16 +217,23 @@ export default async function KeywordsPage({
         <div>
           <h1 className="text-2xl font-bold text-foreground mb-2">Keywords</h1>
           <p className="text-muted-foreground">
-            {count ? `${count.toLocaleString('fr-FR')} mots-clés` : 'Chargement...'}
+            {totalCount.toLocaleString('fr-FR')} mots-clés
+            {hasActiveFilters && ' (filtré)'}
           </p>
         </div>
       </div>
 
-      {/* Search */}
-      <KeywordsSearch initialSearch={search} />
+      {/* Filters */}
+      <KeywordsFilters
+        initialSearch={search}
+        initialPriority={priority}
+        initialPosition={pos}
+        initialClicks={clicks}
+        initialQuickWins={quickwins}
+      />
 
       {/* Table */}
-      {keywords && keywords.length > 0 ? (
+      {paginatedKeywords.length > 0 ? (
         <>
           <div className="bg-card border border-border rounded-xl overflow-hidden">
             <table className="w-full">
@@ -131,11 +248,8 @@ export default async function KeywordsPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {keywords.map((kw) => {
-                  // Get latest position data
-                  const latestPosition = kw.positions && kw.positions.length > 0
-                    ? kw.positions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0]
-                    : null
+                {paginatedKeywords.map((kw) => {
+                  const { latest, previous } = getPositionData(kw.positions)
 
                   return (
                     <tr key={kw.id} className="hover:bg-muted/30 transition-colors">
@@ -143,21 +257,27 @@ export default async function KeywordsPage({
                         <span className="font-medium text-foreground">{kw.keyword}</span>
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={cn(
-                          'inline-flex items-center px-2 py-1 rounded-md text-sm font-medium',
-                          getPositionColor(latestPosition?.position ?? null)
-                        )}>
-                          {latestPosition?.position?.toFixed(1) || '—'}
-                        </span>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <span className={cn(
+                            'inline-flex items-center px-2 py-1 rounded-md text-sm font-medium',
+                            getPositionColor(latest?.position ?? null)
+                          )}>
+                            {latest?.position?.toFixed(1) || '—'}
+                          </span>
+                          <PositionDelta
+                            current={latest?.position ?? null}
+                            previous={previous?.position ?? null}
+                          />
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-foreground">
-                        {formatNumber(latestPosition?.clicks ?? null)}
+                        {formatNumber(latest?.clicks ?? null)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-foreground">
-                        {formatNumber(latestPosition?.impressions ?? null)}
+                        {formatNumber(latest?.impressions ?? null)}
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-foreground">
-                        {latestPosition?.ctr ? `${(latestPosition.ctr * 100).toFixed(1)}%` : '—'}
+                        {latest?.ctr ? `${(latest.ctr * 100).toFixed(1)}%` : '—'}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {kw.priority ? (
@@ -190,7 +310,7 @@ export default async function KeywordsPage({
               <div className="flex gap-2">
                 {page > 1 && (
                   <a
-                    href={`/ogs/app/keywords?q=${search}&page=${page - 1}`}
+                    href={buildPaginationUrl(page - 1)}
                     className="px-3 py-1.5 bg-card border border-border rounded-lg text-sm hover:bg-accent transition-colors"
                   >
                     Précédent
@@ -198,7 +318,7 @@ export default async function KeywordsPage({
                 )}
                 {page < totalPages && (
                   <a
-                    href={`/ogs/app/keywords?q=${search}&page=${page + 1}`}
+                    href={buildPaginationUrl(page + 1)}
                     className="px-3 py-1.5 bg-card border border-border rounded-lg text-sm hover:bg-accent transition-colors"
                   >
                     Suivant
@@ -215,15 +335,15 @@ export default async function KeywordsPage({
             <Key className="w-8 h-8 text-muted-foreground" />
           </div>
           <h3 className="text-lg font-semibold text-foreground mb-2">
-            {search ? 'Aucun résultat' : 'Aucun mot-clé'}
+            {hasActiveFilters || search ? 'Aucun résultat' : 'Aucun mot-clé'}
           </h3>
           <p className="text-muted-foreground mb-4">
-            {search
-              ? `Aucun mot-clé ne correspond à "${search}"`
+            {hasActiveFilters || search
+              ? 'Aucun mot-clé ne correspond aux filtres sélectionnés.'
               : 'Importez vos données pour voir vos mots-clés ici.'
             }
           </p>
-          {!search && (
+          {!search && !hasActiveFilters && (
             <a
               href="/ogs/app/import"
               className="text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300 font-medium"

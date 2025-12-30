@@ -86,7 +86,7 @@ export default function OGSAppLayout({
         {/* Sidebar */}
         <aside
           className={cn(
-            "bg-card border-r border-border flex flex-col py-4 transition-all duration-300",
+            "bg-card border-r border-border flex flex-col py-4 transition-all duration-300 h-screen sticky top-0",
             collapsed ? "w-16 items-center" : "w-56"
           )}
         >

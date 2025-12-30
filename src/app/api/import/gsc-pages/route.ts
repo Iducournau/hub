@@ -93,6 +93,18 @@ export async function POST(request: Request) {
     const today = new Date().toISOString().split('T')[0]
     const errors: string[] = []
 
+    // Récupérer les positions actuelles pour les sauvegarder comme previous_position
+    const { data: existingPages } = await supabase
+      .from('pages')
+      .select('url, position')
+
+    const currentPositions = new Map<string, number | null>()
+    if (existingPages) {
+      for (const page of existingPages) {
+        currentPositions.set(page.url, page.position)
+      }
+    }
+
     // Préparer les données pour upsert en batch
     const pagesToUpsert = []
 
@@ -113,12 +125,16 @@ export async function POST(request: Request) {
       const ctr = parseFloat(ctrStr) / 100
       const position = parseFloat((row['Position'] || '0').replace(',', '.'))
 
+      // Sauvegarder la position actuelle comme previous_position
+      const previousPosition = currentPositions.get(url) ?? null
+
       pagesToUpsert.push({
         url,
         clicks: clicks || null,
         impressions: impressions || null,
         ctr: ctr || null,
         position: position || null,
+        previous_position: previousPosition,
         gsc_date: today,
         status: 'active',
       })
