@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { Search, BarChart3, Users, GraduationCap, BookOpen, ArrowRight } from "lucide-react";
+import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { Button } from "@/components/ui/button";
 
 const modules = [
   {
@@ -145,72 +147,83 @@ const YouSchoolLogo = () => (
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col items-center justify-center p-8">
-      {/* Logo */}
-      <div className="mb-12">
-        <YouSchoolLogo />
-      </div>
+    <div className="min-h-screen bg-white dark:bg-zinc-950 flex flex-col">
+      {/* Header */}
+      <header className="flex items-center justify-end gap-2 p-4">
+        <ThemeToggle />
+        <Button asChild variant="outline" size="sm">
+          <Link href="/login">Connexion</Link>
+        </Button>
+      </header>
 
-      {/* Title */}
-      <h1 className="text-2xl font-medium text-zinc-900 dark:text-white mb-2">
-        Hub
-      </h1>
-      <p className="text-zinc-500 dark:text-zinc-400 mb-12">
-        Sélectionnez un module
-      </p>
+      {/* Main content */}
+      <main className="flex-1 flex flex-col items-center justify-center p-8">
+        {/* Logo */}
+        <div className="mb-12">
+          <YouSchoolLogo />
+        </div>
 
-      {/* Modules Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 max-w-3xl w-full">
-        {modules.map((module) => {
-          const ModuleIcon = module.icon;
+        {/* Title */}
+        <h1 className="text-2xl font-medium text-zinc-900 dark:text-white mb-2">
+          Hub
+        </h1>
+        <p className="text-zinc-500 dark:text-zinc-400 mb-12">
+          Sélectionnez un module
+        </p>
 
-          if (module.available && module.href) {
+        {/* Modules Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 max-w-3xl w-full">
+          {modules.map((module) => {
+            const ModuleIcon = module.icon;
+
+            if (module.available && module.href) {
+              return (
+                <Link
+                  key={module.id}
+                  href={module.href}
+                  className="flex flex-col items-center p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-sm transition-all group"
+                >
+                  <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
+                    <ModuleIcon className="w-6 h-6 text-zinc-700 dark:text-zinc-300" />
+                  </div>
+                  <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                    {module.name}
+                  </span>
+                  <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
+                    {module.description}
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-zinc-400 mt-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </Link>
+              );
+            }
+
             return (
-              <Link
+              <div
                 key={module.id}
-                href={module.href}
-                className="flex flex-col items-center p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 hover:border-zinc-400 dark:hover:border-zinc-600 hover:shadow-sm transition-all group"
+                className="flex flex-col items-center p-6 rounded-xl border border-zinc-100 dark:border-zinc-800/50 bg-zinc-50 dark:bg-zinc-900/50 opacity-60 cursor-not-allowed"
               >
-                <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3 group-hover:bg-zinc-200 dark:group-hover:bg-zinc-700 transition-colors">
-                  <ModuleIcon className="w-6 h-6 text-zinc-700 dark:text-zinc-300" />
+                <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
+                  <ModuleIcon className="w-6 h-6 text-zinc-400 dark:text-zinc-500" />
                 </div>
-                <span className="text-sm font-medium text-zinc-900 dark:text-white">
+                <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
                   {module.name}
                 </span>
-                <span className="text-xs text-zinc-500 dark:text-zinc-400 mt-1 text-center">
+                <span className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 text-center">
                   {module.description}
                 </span>
-                <ArrowRight className="w-4 h-4 text-zinc-400 mt-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </Link>
-            );
-          }
-
-          return (
-            <div
-              key={module.id}
-              className="flex flex-col items-center p-6 rounded-xl border border-zinc-100 dark:border-zinc-800/50 bg-zinc-50 dark:bg-zinc-900/50 opacity-60 cursor-not-allowed"
-            >
-              <div className="w-12 h-12 rounded-xl bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-3">
-                <ModuleIcon className="w-6 h-6 text-zinc-400 dark:text-zinc-500" />
+                <span className="mt-3 px-2 py-0.5 bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 text-[10px] font-medium rounded-full uppercase tracking-wide">
+                  Soon
+                </span>
               </div>
-              <span className="text-sm font-medium text-zinc-500 dark:text-zinc-400">
-                {module.name}
-              </span>
-              <span className="text-xs text-zinc-400 dark:text-zinc-500 mt-1 text-center">
-                {module.description}
-              </span>
-              <span className="mt-3 px-2 py-0.5 bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 text-[10px] font-medium rounded-full uppercase tracking-wide">
-                Soon
-              </span>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
 
-      {/* Footer */}
-      <div className="mt-16 text-xs text-zinc-400 dark:text-zinc-500">
-        YouSchool Hub
-      </div>
+        {/* Footer */}
+        <div className="mt-16 text-xs text-zinc-400 dark:text-zinc-500">
+          YouSchool Hub
+        </div>
+      </main>
     </div>
   );
 }
