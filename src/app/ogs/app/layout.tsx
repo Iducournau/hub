@@ -16,6 +16,8 @@ import {
   Moon,
   Sun,
   Monitor,
+  PanelLeftClose,
+  PanelLeft,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -58,6 +60,7 @@ export default function OGSAppLayout({
   const router = useRouter()
   const { setTheme } = useTheme()
   const [user, setUser] = useState<User | null>(null)
+  const [collapsed, setCollapsed] = useState(false)
 
   useEffect(() => {
     const supabase = createClient()
@@ -80,63 +83,136 @@ export default function OGSAppLayout({
   return (
     <TooltipProvider delayDuration={0}>
       <div className="min-h-screen bg-background flex">
-        {/* Sidebar Icon */}
-        <aside className="w-16 bg-card border-r border-border flex flex-col items-center py-4">
-          {/* Logo */}
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Link
-                href="/"
-                className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600 text-white mb-6 hover:bg-blue-700 transition-colors"
-              >
+        {/* Sidebar */}
+        <aside
+          className={cn(
+            "bg-card border-r border-border flex flex-col py-4 transition-all duration-300",
+            collapsed ? "w-16 items-center" : "w-56"
+          )}
+        >
+          {/* Header */}
+          <div className={cn(
+            "flex items-center mb-6",
+            collapsed ? "justify-center px-0" : "justify-between px-4"
+          )}>
+            <Link
+              href="/"
+              className={cn(
+                "flex items-center gap-3",
+                collapsed && "justify-center"
+              )}
+            >
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600 text-white">
                 <Search className="w-5 h-5" />
-              </Link>
-            </TooltipTrigger>
-            <TooltipContent side="right">
-              <p>OGS Hub</p>
-            </TooltipContent>
-          </Tooltip>
+              </div>
+              {!collapsed && (
+                <div>
+                  <h1 className="font-bold text-foreground">OGS</h1>
+                  <p className="text-xs text-muted-foreground">Outil de Gestion SEO</p>
+                </div>
+              )}
+            </Link>
+            {!collapsed && (
+              <button
+                onClick={() => setCollapsed(true)}
+                className="p-1.5 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </button>
+            )}
+          </div>
+
+          {/* Collapse button when collapsed */}
+          {collapsed && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={() => setCollapsed(false)}
+                  className="mb-4 p-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
+                  <PanelLeft className="w-5 h-5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                <p>Déplier le menu</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
 
           {/* Navigation */}
-          <nav className="flex-1 flex flex-col items-center gap-2">
+          <nav className={cn(
+            "flex-1 flex flex-col gap-1",
+            collapsed ? "items-center px-0" : "px-3"
+          )}>
             {navigation.map((item) => {
               const isActive = pathname === item.href ||
                 (item.href !== '/ogs/app' && pathname.startsWith(item.href))
               const Icon = item.icon
-              return (
-                <Tooltip key={item.name}>
-                  <TooltipTrigger asChild>
-                    <Link
-                      href={item.href}
-                      className={cn(
-                        'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
-                        isActive
-                          ? 'bg-blue-600 text-white'
-                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      )}
-                    >
-                      <Icon className="w-5 h-5" />
-                    </Link>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">
-                    <p>{item.name}</p>
-                  </TooltipContent>
-                </Tooltip>
+
+              const linkContent = (
+                <Link
+                  href={item.href}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg transition-colors',
+                    collapsed ? 'justify-center w-10 h-10' : 'px-3 py-2',
+                    isActive
+                      ? 'bg-blue-600 text-white'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  )}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {!collapsed && (
+                    <span className="text-sm font-medium">{item.name}</span>
+                  )}
+                </Link>
               )
+
+              if (collapsed) {
+                return (
+                  <Tooltip key={item.name}>
+                    <TooltipTrigger asChild>
+                      {linkContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>{item.name}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              }
+
+              return <div key={item.name}>{linkContent}</div>
             })}
           </nav>
 
           {/* Footer - Avatar Dropdown */}
-          <div className="pt-4 border-t border-border">
+          <div className={cn(
+            "pt-4 border-t border-border",
+            collapsed ? "px-0" : "px-3"
+          )}>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
-                  <Avatar className="h-9 w-9 cursor-pointer">
+                <button className={cn(
+                  "flex items-center gap-3 rounded-lg transition-colors w-full",
+                  collapsed
+                    ? "justify-center p-0"
+                    : "px-3 py-2 hover:bg-accent"
+                )}>
+                  <Avatar className="h-9 w-9 cursor-pointer flex-shrink-0">
                     <AvatarImage src={user?.user_metadata?.avatar_url} alt="Avatar" />
                     <AvatarFallback className="bg-blue-600 text-white text-xs">
                       {getInitials(user?.email)}
                     </AvatarFallback>
                   </Avatar>
+                  {!collapsed && (
+                    <div className="flex-1 text-left min-w-0">
+                      <p className="text-sm font-medium text-foreground truncate">
+                        {user?.email?.split('@')[0] || 'Utilisateur'}
+                      </p>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {user?.email || ''}
+                      </p>
+                    </div>
+                  )}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent side="right" align="end" className="w-56">
