@@ -1,6 +1,29 @@
 # Changelog
 
-Toutes les modifications notables de ce projet seront documentées dans ce fichier.
+Toutes les modifications notables de ce projet seront documentees dans ce fichier.
+
+## [0.3.0] - 2024-12-30
+
+### Added
+
+#### Score SEO PageSpeed Insights
+- Migration SQL (`supabase/migrations/005_seo_score.sql`) :
+  - Colonnes : `seo_score`, `performance_score`, `accessibility_score`, `best_practices_score`, `pagespeed_analyzed_at`
+  - Index sur `seo_score`
+- API Route `/api/pagespeed` :
+  - `POST` : Analyse les pages via Google PageSpeed Insights API
+  - `GET` : Recupere les scores moyens
+  - Support cle API optionnelle (`GOOGLE_PAGESPEED_API_KEY`)
+  - Rate limiting (2s entre chaque requete)
+- Composant `PageSpeedAnalyzer` sur le dashboard :
+  - Affichage des 4 scores moyens (SEO, Performance, Accessibilite, Best Practices)
+  - Bouton "Analyser" pour lancer l'analyse des pages
+  - Indicateurs visuels colores (vert >= 90, jaune >= 50, rouge < 50)
+
+### Changed
+- Dashboard : nouvelle grille 3 colonnes (PageSpeed + Clics + Impressions)
+
+---
 
 ## [0.2.0] - 2024-12-30
 

@@ -48,6 +48,7 @@ export default async function ComparePage({
     b_from?: string
     b_to?: string
     metrics?: string
+    formation?: string
   }>
 }) {
   const params = await searchParams
@@ -91,40 +92,81 @@ export default async function ComparePage({
 
   const metricsParam = params.metrics || 'clicks,impressions,position'
   const selectedMetrics = metricsParam.split(',').filter(Boolean)
+  const selectedFormation = params.formation || ''
+
+  // Fetch formations list
+  const { data: formationsData } = await supabase
+    .from('pages')
+    .select('formation')
+    .not('formation', 'is', null)
+    .order('formation')
+
+  const formations = [...new Set(formationsData?.map(f => f.formation).filter(Boolean) || [])] as string[]
+
+  // Build queries with optional formation filter
+  // For pages: join page_metrics_history with pages to filter by formation
+  // For keywords: filter positions via keywords table
+
+  // Get page IDs for selected formation if needed
+  let pageIdsForFormation: string[] | null = null
+  let keywordIdsForFormation: string[] | null = null
+
+  if (selectedFormation) {
+    const [pagesForFormation, keywordsForFormation] = await Promise.all([
+      supabase.from('pages').select('id').eq('formation', selectedFormation),
+      supabase.from('keywords').select('id').eq('formation', selectedFormation),
+    ])
+    pageIdsForFormation = (pagesForFormation.data || []).map(p => p.id)
+    keywordIdsForFormation = (keywordsForFormation.data || []).map(k => k.id)
+  }
+
+  // Build page queries with optional formation filter
+  const buildPageQuery = async (from: string, to: string) => {
+    let query = supabase
+      .from('page_metrics_history')
+      .select('clicks, impressions, position, ctr')
+      .gte('date', from)
+      .lte('date', to)
+
+    if (pageIdsForFormation && pageIdsForFormation.length > 0) {
+      query = query.in('page_id', pageIdsForFormation)
+    } else if (selectedFormation) {
+      // No pages for this formation
+      return { data: [], error: null }
+    }
+    return query
+  }
+
+  // Build keyword queries with optional formation filter
+  const buildKeywordQuery = async (from: string, to: string) => {
+    let query = supabase
+      .from('positions')
+      .select('clicks, impressions, position, ctr')
+      .gte('date', from)
+      .lte('date', to)
+
+    if (keywordIdsForFormation && keywordIdsForFormation.length > 0) {
+      query = query.in('keyword_id', keywordIdsForFormation)
+    } else if (selectedFormation) {
+      // No keywords for this formation
+      return { data: [], error: null }
+    }
+    return query
+  }
 
   // Fetch data in parallel
   const [pagesAResult, pagesBResult, keywordsAResult, keywordsBResult] = await Promise.all([
-    // Pages - Period A
-    supabase
-      .from('page_metrics_history')
-      .select('clicks, impressions, position, ctr')
-      .gte('date', periodA.from)
-      .lte('date', periodA.to),
-    // Pages - Period B
-    supabase
-      .from('page_metrics_history')
-      .select('clicks, impressions, position, ctr')
-      .gte('date', periodB.from)
-      .lte('date', periodB.to),
-    // Keywords - Period A
-    supabase
-      .from('positions')
-      .select('clicks, impressions, position, ctr')
-      .gte('date', periodA.from)
-      .lte('date', periodA.to),
-    // Keywords - Period B
-    supabase
-      .from('positions')
-      .select('clicks, impressions, position, ctr')
-      .gte('date', periodB.from)
-      .lte('date', periodB.to),
+    buildPageQuery(periodA.from, periodA.to),
+    buildPageQuery(periodB.from, periodB.to),
+    buildKeywordQuery(periodA.from, periodA.to),
+    buildKeywordQuery(periodB.from, periodB.to),
   ])
 
   // Aggregate metrics
-  const pagesA = aggregateMetrics((pagesAResult.data || []) as MetricRow[])
-  const pagesB = aggregateMetrics((pagesBResult.data || []) as MetricRow[])
-  const keywordsA = aggregateMetrics((keywordsAResult.data || []) as MetricRow[])
-  const keywordsB = aggregateMetrics((keywordsBResult.data || []) as MetricRow[])
+  const pagesA = aggregateMetrics((pagesAResult.data || []) as unknown as MetricRow[])
+  const pagesB = aggregateMetrics((pagesBResult.data || []) as unknown as MetricRow[])
+  const keywordsA = aggregateMetrics((keywordsAResult.data || []) as unknown as MetricRow[])
+  const keywordsB = aggregateMetrics((keywordsBResult.data || []) as unknown as MetricRow[])
 
   const periodALabel = formatPeriodLabel(periodA.from, periodA.to)
   const periodBLabel = formatPeriodLabel(periodB.from, periodB.to)
@@ -150,6 +192,8 @@ export default async function ComparePage({
         periodA={periodA}
         periodB={periodB}
         metrics={selectedMetrics}
+        formations={formations}
+        selectedFormation={selectedFormation}
       />
 
       {/* Comparison Tables */}

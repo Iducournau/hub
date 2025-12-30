@@ -8,6 +8,13 @@ import {
   formatDateForUrl,
   parseDateFromUrl,
 } from '@/components/ui/date-range-picker'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { format, startOfMonth, endOfMonth, subMonths, subQuarters, startOfQuarter, endOfQuarter } from 'date-fns'
 import { fr } from 'date-fns/locale'
@@ -16,6 +23,8 @@ interface CompareFiltersProps {
   periodA: { from: string; to: string }
   periodB: { from: string; to: string }
   metrics: string[]
+  formations: string[]
+  selectedFormation: string
 }
 
 const availableMetrics = [
@@ -38,7 +47,7 @@ const quickPresets = [
   },
 ]
 
-export function CompareFilters({ periodA, periodB, metrics }: CompareFiltersProps) {
+export function CompareFilters({ periodA, periodB, metrics, formations, selectedFormation }: CompareFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
@@ -156,23 +165,49 @@ export function CompareFilters({ periodA, periodB, metrics }: CompareFiltersProp
         )}
       </div>
 
-      {/* Metrics Selection */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-medium text-muted-foreground mr-2">Metriques :</span>
-        {availableMetrics.map((metric) => (
-          <button
-            key={metric.key}
-            onClick={() => handleMetricToggle(metric.key)}
-            className={cn(
-              'px-3 py-1.5 text-sm rounded-lg border transition-colors',
-              selectedMetrics.includes(metric.key)
-                ? 'bg-blue-600 border-blue-600 text-white'
-                : 'bg-card border-border text-muted-foreground hover:bg-accent'
-            )}
-          >
-            {metric.label}
-          </button>
-        ))}
+      {/* Formation + Metrics Selection */}
+      <div className="flex flex-wrap items-center gap-4">
+        {/* Formation Filter */}
+        {formations.length > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground">Formation :</span>
+            <Select
+              value={selectedFormation || 'all'}
+              onValueChange={(value) => updateUrl({ formation: value === 'all' ? null : value })}
+            >
+              <SelectTrigger className="w-[200px] bg-card">
+                <SelectValue placeholder="Toutes formations" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Toutes formations</SelectItem>
+                {formations.map((f) => (
+                  <SelectItem key={f} value={f}>
+                    {f.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
+        {/* Metrics Selection */}
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-muted-foreground">Metriques :</span>
+          {availableMetrics.map((metric) => (
+            <button
+              key={metric.key}
+              onClick={() => handleMetricToggle(metric.key)}
+              className={cn(
+                'px-3 py-1.5 text-sm rounded-lg border transition-colors',
+                selectedMetrics.includes(metric.key)
+                  ? 'bg-blue-600 border-blue-600 text-white'
+                  : 'bg-card border-border text-muted-foreground hover:bg-accent'
+              )}
+            >
+              {metric.label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )
