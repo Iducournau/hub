@@ -18,6 +18,7 @@ import {
   Monitor,
   PanelLeftClose,
   PanelLeft,
+  GitCompare,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -47,6 +48,7 @@ const navigation = [
   { name: 'Dashboard', href: '/ogs/app', icon: LayoutDashboard },
   { name: 'Keywords', href: '/ogs/app/keywords', icon: Key },
   { name: 'Pages', href: '/ogs/app/pages', icon: FileText },
+  { name: 'Comparateur', href: '/ogs/app/compare', icon: GitCompare },
   { name: 'Import', href: '/ogs/app/import', icon: Upload },
   { name: 'Alertes', href: '/ogs/app/alerts', icon: AlertTriangle },
 ]

@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { startOfMonth, subMonths, format } from 'date-fns'
 import { fr } from 'date-fns/locale'
+import { PageSpeedAnalyzer } from './pagespeed-analyzer'
 
 // Position badge color
 function getPositionColor(position: number | null) {
@@ -104,6 +105,7 @@ export default async function DashboardPage() {
     thisMonthHistoryResult,
     lastMonthHistoryResult,
     last3MonthsHistoryResult,
+    pageSpeedResult,
   ] = await Promise.all([
     supabase.from('keywords').select('id', { count: 'exact', head: true }),
     supabase.from('pages').select('id, position, previous_position, clicks, impressions', { count: 'exact' }),
@@ -123,12 +125,32 @@ export default async function DashboardPage() {
       .select('clicks, impressions, position, date')
       .gte('date', startOfMonth(subMonths(now, 2)).toISOString().split('T')[0])
       .order('date', { ascending: true }),
+    // PageSpeed scores
+    supabase.from('pages')
+      .select('seo_score, performance_score, accessibility_score, best_practices_score'),
   ])
 
   const totalKeywords = keywordsResult.count || 0
   const totalPages = pagesResult.count || 0
   const totalAlerts = alertsResult.count || 0
   const topPages = topPagesResult.data || []
+
+  // PageSpeed scores
+  const pageSpeedData = pageSpeedResult.data || []
+  const pagesWithSeoScore = pageSpeedData.filter(p => p.seo_score !== null)
+  const avgSeoScore = pagesWithSeoScore.length > 0
+    ? Math.round(pagesWithSeoScore.reduce((sum, p) => sum + (p.seo_score || 0), 0) / pagesWithSeoScore.length)
+    : null
+  const avgPerformanceScore = pagesWithSeoScore.length > 0
+    ? Math.round(pagesWithSeoScore.filter(p => p.performance_score !== null).reduce((sum, p) => sum + (p.performance_score || 0), 0) / pagesWithSeoScore.filter(p => p.performance_score !== null).length) || null
+    : null
+  const avgAccessibilityScore = pagesWithSeoScore.length > 0
+    ? Math.round(pagesWithSeoScore.filter(p => p.accessibility_score !== null).reduce((sum, p) => sum + (p.accessibility_score || 0), 0) / pagesWithSeoScore.filter(p => p.accessibility_score !== null).length) || null
+    : null
+  const avgBestPracticesScore = pagesWithSeoScore.length > 0
+    ? Math.round(pagesWithSeoScore.filter(p => p.best_practices_score !== null).reduce((sum, p) => sum + (p.best_practices_score || 0), 0) / pagesWithSeoScore.filter(p => p.best_practices_score !== null).length) || null
+    : null
+  const pagesAnalyzed = pagesWithSeoScore.length
 
   // Current metrics from pages table
   const pagesData = pagesResult.data || []
@@ -377,9 +399,19 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* Secondary stats - Totals */}
+      {/* PageSpeed & Secondary stats */}
       {hasData && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          {/* PageSpeed Analyzer */}
+          <PageSpeedAnalyzer
+            avgSeoScore={avgSeoScore}
+            avgPerformanceScore={avgPerformanceScore}
+            avgAccessibilityScore={avgAccessibilityScore}
+            avgBestPracticesScore={avgBestPracticesScore}
+            pagesAnalyzed={pagesAnalyzed}
+            totalPages={totalPages}
+          />
+          {/* Clics totaux */}
           <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center gap-3 mb-2">
               <div className="bg-violet-600 p-2 rounded-lg">
@@ -391,6 +423,7 @@ export default async function DashboardPage() {
               </div>
             </div>
           </div>
+          {/* Impressions totales */}
           <div className="bg-card border border-border rounded-xl p-5">
             <div className="flex items-center gap-3 mb-2">
               <div className="bg-pink-600 p-2 rounded-lg">
