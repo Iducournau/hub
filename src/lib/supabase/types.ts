@@ -51,6 +51,11 @@ export type Database = {
           title: string | null
           status: string
           created_at: string
+          clicks: number | null
+          impressions: number | null
+          ctr: number | null
+          position: number | null
+          gsc_date: string | null
         }
         Insert: {
           id?: string
@@ -58,6 +63,11 @@ export type Database = {
           title?: string | null
           status?: string
           created_at?: string
+          clicks?: number | null
+          impressions?: number | null
+          ctr?: number | null
+          position?: number | null
+          gsc_date?: string | null
         }
         Update: {
           id?: string
@@ -65,6 +75,11 @@ export type Database = {
           title?: string | null
           status?: string
           created_at?: string
+          clicks?: number | null
+          impressions?: number | null
+          ctr?: number | null
+          position?: number | null
+          gsc_date?: string | null
         }
       }
       positions: {

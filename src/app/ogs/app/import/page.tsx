@@ -1,17 +1,26 @@
 'use client'
 
 import { useState, useRef } from 'react'
-import { Upload, FileSpreadsheet, Globe, BarChart3, Check, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
+import { Upload, FileSpreadsheet, FileText, Globe, BarChart3, Check, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 const importSources = [
   {
     id: 'gsc',
-    name: 'Google Search Console',
-    description: 'Positions, clicks, impressions, CTR',
+    name: 'GSC - Keywords',
+    description: 'Requêtes, positions, clicks, impressions',
     icon: Globe,
     color: 'bg-green-600',
-    format: 'CSV exporté depuis GSC',
+    format: 'Export "Requêtes" depuis GSC',
+    enabled: true,
+  },
+  {
+    id: 'gsc-pages',
+    name: 'GSC - Pages',
+    description: 'URLs, clicks, impressions, CTR',
+    icon: FileText,
+    color: 'bg-emerald-600',
+    format: 'Export "Pages" depuis GSC',
     enabled: true,
   },
   {
@@ -37,10 +46,13 @@ const importSources = [
 interface ImportResult {
   success: boolean
   stats?: {
-    keywords_created: number
-    keywords_existing: number
-    positions_created: number
+    keywords_created?: number
+    keywords_existing?: number
+    positions_created?: number
+    pages_created?: number
+    pages_updated?: number
   }
+  total_processed?: number
   error?: string
   errors?: string[]
 }
@@ -281,9 +293,19 @@ export default function ImportPage() {
                   Import réussi
                 </h4>
                 <p className="text-sm text-muted-foreground">
-                  {result.stats?.keywords_created} nouveaux mots-clés, {' '}
-                  {result.stats?.keywords_existing} existants, {' '}
-                  {result.stats?.positions_created} positions enregistrées
+                  {result.stats?.keywords_created !== undefined ? (
+                    <>
+                      {result.stats.keywords_created} nouveaux mots-clés, {' '}
+                      {result.stats.keywords_existing} existants, {' '}
+                      {result.stats.positions_created} positions enregistrées
+                    </>
+                  ) : result.stats?.pages_created !== undefined ? (
+                    <>
+                      {result.total_processed} pages traitées
+                    </>
+                  ) : (
+                    'Import terminé'
+                  )}
                 </p>
               </>
             ) : (
