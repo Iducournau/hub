@@ -4,15 +4,19 @@ import { cookies } from 'next/headers'
 import Papa from 'papaparse'
 
 interface GSCRow {
-  // Français
+  // Avec en-tête (FR) - GSC export
+  'Requêtes les plus fréquentes'?: string
   'Requête'?: string
   'Clics'?: string
   'Impressions'?: string
   'CTR'?: string
   'Position'?: string
-  // Anglais
+  // Avec en-tête (EN)
+  'Top queries'?: string
   'Query'?: string
   'Clicks'?: string
+  // Index signature pour flexibilité
+  [key: string]: string | undefined
 }
 
 interface ImportStats {
@@ -69,10 +73,11 @@ export async function POST(request: Request) {
     // Lire le contenu du fichier
     const text = await file.text()
 
-    // Parser le CSV
+    // Parser le CSV (auto-détection du délimiteur: tab ou virgule)
     const parsed = Papa.parse<GSCRow>(text, {
       header: true,
       skipEmptyLines: true,
+      delimiter: '', // Auto-detect
       transformHeader: (header) => header.trim(),
     })
 
@@ -94,14 +99,20 @@ export async function POST(request: Request) {
 
     // Traiter chaque ligne
     for (const row of parsed.data) {
-      // Récupérer le mot-clé (FR ou EN)
-      const keywordText = (row['Requête'] || row['Query'] || '').trim()
+      // Récupérer le mot-clé (plusieurs formats possibles)
+      const keywordText = (
+        row['Requêtes les plus fréquentes'] ||
+        row['Top queries'] ||
+        row['Requête'] ||
+        row['Query'] ||
+        ''
+      ).trim()
       if (!keywordText) continue
 
       // Récupérer les métriques
       const clicks = parseInt(row['Clics'] || row['Clicks'] || '0', 10)
       const impressions = parseInt(row['Impressions'] || '0', 10)
-      const ctrStr = (row['CTR'] || '0').replace('%', '').replace(',', '.')
+      const ctrStr = (row['CTR'] || '0').replace('%', '').replace(',', '.').trim()
       const ctr = parseFloat(ctrStr) / 100 // Convertir % en décimal
       const position = parseFloat((row['Position'] || '0').replace(',', '.'))
 
