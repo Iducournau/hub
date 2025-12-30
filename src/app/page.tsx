@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { Search, BarChart3, Users, GraduationCap, BookOpen, ArrowRight } from "lucide-react";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { Button } from "@/components/ui/button";
+import { HubHeader } from "@/components/hub-header";
 
 const modules = [
   {
@@ -149,12 +148,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col">
       {/* Header */}
-      <header className="flex items-center justify-end gap-2 p-4">
-        <ThemeToggle />
-        <Button asChild variant="outline" size="sm">
-          <Link href="/login">Connexion</Link>
-        </Button>
-      </header>
+      <HubHeader />
 
       {/* Main content */}
       <main className="flex-1 flex flex-col items-center justify-center p-8">
