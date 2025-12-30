@@ -2,8 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { LogoutButton } from '@/components/auth/logout-button'
 import {
   LayoutDashboard,
   Key,
@@ -11,8 +11,35 @@ import {
   Upload,
   AlertTriangle,
   Search,
-  ChevronLeft
+  Home,
+  LogOut,
+  Moon,
+  Sun,
+  Monitor,
 } from 'lucide-react'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuPortal,
+} from '@/components/ui/dropdown-menu'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
+import type { User } from '@supabase/supabase-js'
 
 const navigation = [
   { name: 'Dashboard', href: '/ogs/app', icon: LayoutDashboard },
@@ -28,65 +55,146 @@ export default function OGSAppLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const router = useRouter()
+  const { setTheme } = useTheme()
+  const [user, setUser] = useState<User | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user)
+    })
+  }, [])
+
+  const handleLogout = async () => {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
+
+  const getInitials = (email: string | undefined) => {
+    if (!email) return 'U'
+    return email.substring(0, 2).toUpperCase()
+  }
 
   return (
-    <div className="min-h-screen bg-slate-900 flex">
-      {/* Sidebar */}
-      <aside className="w-64 bg-slate-950 border-r border-slate-800 flex flex-col">
-        {/* Logo */}
-        <div className="p-4 border-b border-slate-800">
-          <Link href="/" className="flex items-center gap-2 text-slate-400 hover:text-white text-sm mb-3">
-            <ChevronLeft className="w-4 h-4" />
-            Retour au Hub
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-2 rounded-lg">
-              <Search className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="font-bold text-white">OGS</h1>
-              <p className="text-xs text-slate-500">Outil de Gestion SEO</p>
-            </div>
-          </div>
-        </div>
+    <TooltipProvider delayDuration={0}>
+      <div className="min-h-screen bg-background flex">
+        {/* Sidebar Icon */}
+        <aside className="w-16 bg-card border-r border-border flex flex-col items-center py-4">
+          {/* Logo */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Link
+                href="/"
+                className="flex items-center justify-center w-10 h-10 rounded-lg bg-blue-600 text-white mb-6 hover:bg-blue-700 transition-colors"
+              >
+                <Search className="w-5 h-5" />
+              </Link>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              <p>OGS Hub</p>
+            </TooltipContent>
+          </Tooltip>
 
-        {/* Navigation */}
-        <nav className="flex-1 p-4">
-          <ul className="space-y-1">
+          {/* Navigation */}
+          <nav className="flex-1 flex flex-col items-center gap-2">
             {navigation.map((item) => {
               const isActive = pathname === item.href ||
                 (item.href !== '/ogs/app' && pathname.startsWith(item.href))
               const Icon = item.icon
               return (
-                <li key={item.name}>
-                  <Link
-                    href={item.href}
-                    className={cn(
-                      'flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors',
-                      isActive
-                        ? 'bg-indigo-600 text-white'
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                    )}
-                  >
-                    <Icon className="w-4 h-4" />
-                    {item.name}
-                  </Link>
-                </li>
+                <Tooltip key={item.name}>
+                  <TooltipTrigger asChild>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                        isActive
+                          ? 'bg-blue-600 text-white'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                      )}
+                    >
+                      <Icon className="w-5 h-5" />
+                    </Link>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>{item.name}</p>
+                  </TooltipContent>
+                </Tooltip>
               )
             })}
-          </ul>
-        </nav>
+          </nav>
 
-        {/* Footer */}
-        <div className="p-4 border-t border-slate-800">
-          <LogoutButton className="flex items-center gap-2 text-sm text-slate-400 hover:text-white transition-colors w-full px-3 py-2 rounded-lg hover:bg-slate-800" />
-        </div>
-      </aside>
+          {/* Footer - Avatar Dropdown */}
+          <div className="pt-4 border-t border-border">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
+                  <Avatar className="h-9 w-9 cursor-pointer">
+                    <AvatarImage src={user?.user_metadata?.avatar_url} alt="Avatar" />
+                    <AvatarFallback className="bg-blue-600 text-white text-xs">
+                      {getInitials(user?.email)}
+                    </AvatarFallback>
+                  </Avatar>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">Mon compte</p>
+                    <p className="text-xs leading-none text-muted-foreground truncate">
+                      {user?.email || 'utilisateur@example.com'}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/" className="cursor-pointer">
+                    <Home className="mr-2 h-4 w-4" />
+                    Retour au Hub
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>
+                    <Sun className="mr-2 h-4 w-4" />
+                    Thème
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent>
+                      <DropdownMenuItem onClick={() => setTheme('light')}>
+                        <Sun className="mr-2 h-4 w-4" />
+                        Clair
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme('dark')}>
+                        <Moon className="mr-2 h-4 w-4" />
+                        Sombre
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setTheme('system')}>
+                        <Monitor className="mr-2 h-4 w-4" />
+                        Système
+                      </DropdownMenuItem>
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className="text-destructive focus:text-destructive cursor-pointer"
+                >
+                  <LogOut className="mr-2 h-4 w-4" />
+                  Déconnexion
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </aside>
 
-      {/* Main content */}
-      <main className="flex-1 overflow-auto">
-        {children}
-      </main>
-    </div>
+        {/* Main content */}
+        <main className="flex-1 overflow-auto">
+          {children}
+        </main>
+      </div>
+    </TooltipProvider>
   )
 }
