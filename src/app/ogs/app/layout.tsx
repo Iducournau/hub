@@ -19,6 +19,8 @@ import {
   PanelLeftClose,
   PanelLeft,
   GitCompare,
+  Map,
+  ListChecks,
 } from 'lucide-react'
 import {
   Tooltip,
@@ -51,6 +53,8 @@ const navigation = [
   { name: 'Comparateur', href: '/ogs/app/compare', icon: GitCompare },
   { name: 'Import', href: '/ogs/app/import', icon: Upload },
   { name: 'Alertes', href: '/ogs/app/alerts', icon: AlertTriangle },
+  { name: 'Roadmap', href: '/ogs/app/roadmap', icon: Map },
+  { name: 'Fonctionnalités', href: '/ogs/app/features', icon: ListChecks },
 ]
 
 export default function OGSAppLayout({
