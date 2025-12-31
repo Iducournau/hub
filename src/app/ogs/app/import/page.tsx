@@ -30,7 +30,7 @@ const importSources = [
     icon: BarChart3,
     color: 'bg-orange-600',
     format: 'Export Organic Research',
-    enabled: false,
+    enabled: true,
   },
   {
     id: 'screaming',
@@ -48,6 +48,7 @@ interface ImportResult {
   stats?: {
     keywords_created?: number
     keywords_existing?: number
+    keywords_updated?: number
     positions_created?: number
     pages_created?: number
     pages_updated?: number
@@ -295,9 +296,16 @@ export default function ImportPage() {
                 <p className="text-sm text-muted-foreground">
                   {result.stats?.keywords_created !== undefined ? (
                     <>
-                      {result.stats.keywords_created} nouveaux mots-clés, {' '}
-                      {result.stats.keywords_existing} existants, {' '}
-                      {result.stats.positions_created} positions enregistrées
+                      {result.stats.keywords_created} nouveaux mots-clés
+                      {result.stats.keywords_existing !== undefined && (
+                        <>, {result.stats.keywords_existing} existants</>
+                      )}
+                      {result.stats.keywords_updated !== undefined && result.stats.keywords_updated > 0 && (
+                        <>, {result.stats.keywords_updated} mis à jour</>
+                      )}
+                      {result.stats.positions_created !== undefined && (
+                        <>, {result.stats.positions_created} positions enregistrées</>
+                      )}
                     </>
                   ) : result.stats?.pages_created !== undefined ? (
                     <>
